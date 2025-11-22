@@ -2,6 +2,7 @@ import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.filters import Command
 
 
 import os
@@ -25,7 +26,7 @@ dp = Dispatcher()
 async def start(message: types.Message):
     await message.answer("Assalomu alaykum! Klinikamizning Pro botiga xush kelibsiz 🚑")
 
-@dp.message(commands=["services"])
+@dp.message(Command("services"))
 async def services(message: types.Message):
     await message.answer(
         "Quyidagi xizmatlardan birini tanlang:",
