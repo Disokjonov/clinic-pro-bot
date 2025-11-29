@@ -1,117 +1,170 @@
-import asyncio
+import logging
 import os
+from aiogram import Bot, Dispatcher, executor, types
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
+from dotenv import load_dotenv
 
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command, CommandStart
-from aiogram.types import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
-    KeyboardButton
-)
+load_dotenv()
 
-# =========================
-# ✅ TOKEN (Railway ENV dan olinadi)
-# =========================
-TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-if not TOKEN:
-    raise ValueError("BOT_TOKEN topilmadi! Railway Variables ichiga BOT_TOKEN kiriting.")
+logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
+bot = Bot(token=BOT_TOKEN)
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
 
 # =========================
-# ✅ REPLY KEYBOARD (PASTKI ASOSIY MENU)
+# STATES
 # =========================
-main_menu = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="🏥 Xizmatlar")],
-        [KeyboardButton(text="📅 Qabulga yozilish")],
-        [KeyboardButton(text="ℹ️ Klinika haqida")],
-    ],
-    resize_keyboard=True
-)
+
+class Booking(StatesGroup):
+    department = State()
+    doctor = State()
+    date = State()
+    time = State()
+    name = State()
+    phone = State()
 
 # =========================
-# ✅ INLINE KEYBOARD (XIZMATLAR RO'YXATI)
+# START
 # =========================
-services_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="🧑‍⚕️ Terapiya", callback_data="service_terapiya")],
-    [InlineKeyboardButton(text="🩺 LOR", callback_data="service_lor")],
-    [InlineKeyboardButton(text="🫀 UZI", callback_data="service_uzi")],
-    [InlineKeyboardButton(text="🦷 Stomatologiya", callback_data="service_stom")],
-    [InlineKeyboardButton(text="🧲 MRT", callback_data="service_mrt")],
-    [InlineKeyboardButton(text="👶 Pediatriya", callback_data="service_pediatriya")],
-])
 
-# =========================
-# ✅ /start — ASOSIY MENYU
-# =========================
-@dp.message(CommandStart())
-async def start(message: types.Message):
+@dp.message_handler(commands=['start'])
+async def start_handler(message: types.Message):
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add("🗓 Qabulga yozilish", "🧑‍⚕️ Shifokorlar")
+    kb.add("💊 Xizmatlar", "🧠 Savol-javob")
+    kb.add("📍 Manzil & Aloqa", "🎁 Aksiya")
+
     await message.answer(
-        "Assalomu alaykum! Klinikamizning Pro botiga xush kelibsiz 🚑\n\n"
-        "Kerakli bo‘limni tanlang:",
-        reply_markup=main_menu
+        "MedLine Plus klinikasiga xush kelibsiz.\nQanday yordam beray?",
+        reply_markup=kb
     )
 
 # =========================
-# ✅ 🏥 XIZMATLAR (REPLY -> INLINE)
+# BOOKING FLOW
 # =========================
-@dp.message(F.text == "🏥 Xizmatlar")
-async def show_services(message: types.Message):
+
+@dp.message_handler(lambda m: m.text == "🗓 Qabulga yozilish")
+async def start_booking(message: types.Message):
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add("🦷 Stomatologiya", "👂 LOR")
+    kb.add("🩺 Urologiya", "❤️ Kardiologiya")
+
+    await Booking.department.set()
+    await message.answer("Yo‘nalishni tanlang:", reply_markup=kb)
+
+
+@dp.message_handler(state=Booking.department)
+async def choose_doctor(message: types.Message, state: FSMContext):
+    await state.update_data(department=message.text)
+
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add("👨‍⚕️ Dr. Akmal Saidov", "👨‍⚕️ Dr. Timur Xasanov")
+
+    await Booking.doctor.set()
+    await message.answer("Shifokorni tanlang:", reply_markup=kb)
+
+
+@dp.message_handler(state=Booking.doctor)
+async def choose_date(message: types.Message, state: FSMContext):
+    await state.update_data(doctor=message.text)
+
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add("30-noyabr", "1-dekabr", "2-dekabr")
+
+    await Booking.date.set()
+    await message.answer("Qabul sanasini tanlang:", reply_markup=kb)
+
+
+@dp.message_handler(state=Booking.date)
+async def choose_time(message: types.Message, state: FSMContext):
+    await state.update_data(date=message.text)
+
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add("10:00", "11:30", "14:00")
+
+    await Booking.time.set()
+    await message.answer("Bo‘sh vaqtni tanlang:", reply_markup=kb)
+
+
+@dp.message_handler(state=Booking.time)
+async def ask_name(message: types.Message, state: FSMContext):
+    await state.update_data(time=message.text)
+
+    await Booking.name.set()
+    await message.answer("Ismingizni kiriting:")
+
+
+@dp.message_handler(state=Booking.name)
+async def ask_phone(message: types.Message, state: FSMContext):
+    await state.update_data(name=message.text)
+
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add(types.KeyboardButton("📱 Raqamni yuborish", request_contact=True))
+
+    await Booking.phone.set()
+    await message.answer("Telefon raqamingizni yuboring:", reply_markup=kb)
+
+
+@dp.message_handler(content_types=types.ContentType.CONTACT, state=Booking.phone)
+async def finish_booking(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+
+    department = data['department']
+    doctor = data['doctor']
+    date = data['date']
+    time = data['time']
+    name = data['name']
+    phone = message.contact.phone_number
+
     await message.answer(
-        "Quyidagi xizmatlardan birini tanlang:",
-        reply_markup=services_keyboard
+        f"✅ Qabul muvaffaqiyatli bron qilindi!\n\n"
+        f"👤 Bemor: {name}\n"
+        f"📞 Telefon: {phone}\n"
+        f"🩺 Yo‘nalish: {department}\n"
+        f"👨‍⚕️ Shifokor: {doctor}\n"
+        f"📅 Sana: {date}\n"
+        f"⏰ Vaqt: {time}\n\n"
+        f"📍 MedLine Plus klinikasi"
     )
 
-# =========================
-# ✅ XIZMAT ICHKI SAHIFASI
-# =========================
-@dp.callback_query()
-async def service_details(callback: types.CallbackQuery):
-    if not callback.data.startswith("service_"):
-        return
-
-    service = callback.data.replace("service_", "").capitalize()
-
-    text = (
-        f"🔍 <b>{service}</b> xizmati\n\n"
-        f"Bu bo‘limda {service} bo‘yicha:\n"
-        f"✅ Maslahat\n"
-        f"✅ Tekshiruv\n"
-        f"✅ Davolash\n\n"
-        f"📅 Qabulga yozilish tugmasi tez orada qo‘shiladi."
-    )
-
-    await callback.message.edit_text(text, parse_mode="HTML")
+    await state.finish()
 
 # =========================
-# ✅ 📅 QABULGA YOZILISH
+# OTHER BUTTONS
 # =========================
-@dp.message(F.text == "📅 Qabulga yozilish")
-async def booking(message: types.Message):
+
+@dp.message_handler(lambda m: m.text == "🧑‍⚕️ Shifokorlar")
+async def doctors(message: types.Message):
     await message.answer(
-        "📅 Qabulga yozilish bo‘limi hozircha test rejimida.\n\n"
-        "Iltimos, operator bilan bog‘laning."
+        "👨‍⚕️ Dr. Akmal Saidov — 15 yil tajriba\n"
+        "👨‍⚕️ Dr. Timur Xasanov — 10 yil tajriba"
     )
 
-# =========================
-# ✅ ℹ️ KLINIKA HAQIDA
-# =========================
-@dp.message(F.text == "ℹ️ Klinika haqida")
-async def about(message: types.Message):
+
+@dp.message_handler(lambda m: m.text == "💊 Xizmatlar")
+async def services(message: types.Message):
     await message.answer(
-        "ℹ️ Biz zamonaviy uskuna va malakali shifokorlar bilan ishlaydigan klinikamiz.\n\n"
-        "📍 Manzil, 📞 aloqa va 🔗 ijtimoiy tarmoqlar tez orada qo‘shiladi."
+        "🦷 Stomatologiya\n"
+        "👂 LOR\n"
+        "🩺 Urologiya\n"
+        "❤️ Kardiologiya"
+    )
+
+
+@dp.message_handler(lambda m: m.text == "📍 Manzil & Aloqa")
+async def location(message: types.Message):
+    await message.answer(
+        "📍 Toshkent, Yunusobod 15-mavze\n📞 +998 90 000 00 00"
     )
 
 # =========================
-# ✅ BOTNI ISHGA TUSHIRISH
+# RUN
 # =========================
-async def main():
-    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    executor.start_polling(dp, skip_updates=True)
