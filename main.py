@@ -1,9 +1,8 @@
 import asyncio
 import os
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
-from aiogram import F
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -12,9 +11,12 @@ from aiogram.types import (
 )
 
 # =========================
-# ✅ TOKEN O'QIB OLISH
+# ✅ TOKEN (Railway ENV dan olinadi)
 # =========================
 TOKEN = os.getenv("BOT_TOKEN")
+
+if not TOKEN:
+    raise ValueError("BOT_TOKEN topilmadi! Railway Variables ichiga BOT_TOKEN kiriting.")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -32,7 +34,7 @@ main_menu = ReplyKeyboardMarkup(
 )
 
 # =========================
-# ✅ INLINE KEYBOARD (XIZMATLAR)
+# ✅ INLINE KEYBOARD (XIZMATLAR RO'YXATI)
 # =========================
 services_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🧑‍⚕️ Terapiya", callback_data="service_terapiya")],
@@ -44,7 +46,7 @@ services_keyboard = InlineKeyboardMarkup(inline_keyboard=[
 ])
 
 # =========================
-# ✅ /start — ASOSIY MENYU CHIQADI
+# ✅ /start — ASOSIY MENYU
 # =========================
 @dp.message(CommandStart())
 async def start(message: types.Message):
@@ -55,9 +57,9 @@ async def start(message: types.Message):
     )
 
 # =========================
-# ✅ 🏥 XIZMATLAR (REPLY → INLINE)
+# ✅ 🏥 XIZMATLAR (REPLY -> INLINE)
 # =========================
-@dp.message(Text("🏥 Xizmatlar"))
+@dp.message(F.text == "🏥 Xizmatlar")
 async def show_services(message: types.Message):
     await message.answer(
         "Quyidagi xizmatlardan birini tanlang:",
@@ -86,19 +88,19 @@ async def service_details(callback: types.CallbackQuery):
     await callback.message.edit_text(text, parse_mode="HTML")
 
 # =========================
-# ✅ 📅 QABULGA YOZILISH (HOZIRCHA MATN)
+# ✅ 📅 QABULGA YOZILISH
 # =========================
-@dp.message(Text("📅 Qabulga yozilish"))
+@dp.message(F.text == "📅 Qabulga yozilish")
 async def booking(message: types.Message):
     await message.answer(
-        "📅 Qabulga yozilish bo‘limi tez orada ishga tushadi.\n\n"
-        "Hozircha operator bilan bog‘laning."
+        "📅 Qabulga yozilish bo‘limi hozircha test rejimida.\n\n"
+        "Iltimos, operator bilan bog‘laning."
     )
 
 # =========================
 # ✅ ℹ️ KLINIKA HAQIDA
 # =========================
-@dp.message(Text("ℹ️ Klinika haqida"))
+@dp.message(F.text == "ℹ️ Klinika haqida")
 async def about(message: types.Message):
     await message.answer(
         "ℹ️ Biz zamonaviy uskuna va malakali shifokorlar bilan ishlaydigan klinikamiz.\n\n"
@@ -113,4 +115,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
