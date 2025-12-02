@@ -11,6 +11,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 
 logging.basicConfig(level=logging.INFO)
 
