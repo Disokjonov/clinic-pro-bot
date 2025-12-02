@@ -140,7 +140,7 @@ async def finish_booking(message: Message, state: FSMContext):
 
     phone = message.contact.phone_number
 
-    await message.answer(
+    user_text = (
         f"✅ Qabul muvaffaqiyatli bron qilindi!\n\n"
         f"👤 Bemor: {data['name']}\n"
         f"📞 Telefon: {phone}\n"
@@ -151,7 +151,24 @@ async def finish_booking(message: Message, state: FSMContext):
         f"📍 MedLine Plus klinikasi"
     )
 
+    admin_text = (
+        f"📥 YANGI BRON\n\n"
+        f"👤 Bemor: {data['name']}\n"
+        f"📞 Telefon: {phone}\n"
+        f"🩺 Yo‘nalish: {data['department']}\n"
+        f"👨‍⚕️ Shifokor: {data['doctor']}\n"
+        f"📅 Sana: {data['date']}\n"
+        f"⏰ Vaqt: {data['time']}"
+    )
+
+    # FOYDALANUVCHIGA TASDIQ
+    await message.answer(user_text)
+
+    # ADMIN PANELGA YUBORISH
+    await bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_text)
+
     await state.clear()
+
 
 # =========================
 # STATIC BUTTONS
