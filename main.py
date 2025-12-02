@@ -259,6 +259,19 @@ async def ai_answer(message: Message, state: FSMContext):
     await message.answer(final_text)
     await state.clear()
 
+@dp.message(F.text == "/ai_test")
+async def ai_test(message: Message):
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": "Hello"}],
+            max_tokens=20
+        )
+        await message.answer("✅ AI ishlayapti")
+    except Exception as e:
+        await message.answer(f"❌ AI ERROR:\n{e}")
+
+
 
 # =========================
 # 🚀 BOTNI ISHGA TUSHIRISH
