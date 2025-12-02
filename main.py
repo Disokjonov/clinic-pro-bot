@@ -1,3 +1,7 @@
+# =========================
+# 🔧 IMPORTLAR
+# =========================
+
 import asyncio
 import logging
 import os
@@ -9,17 +13,29 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 
+from openai import OpenAI
+
+
+# =========================
+# 🔧 ENV & BOT SOZLAMALARI
+# =========================
+
 load_dotenv()
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
+
 # =========================
-# STATES
+# 🔁 FSM STATES
 # =========================
 
 class Booking(StatesGroup):
@@ -30,8 +46,13 @@ class Booking(StatesGroup):
     name = State()
     phone = State()
 
+
+class AIChat(StatesGroup):
+    question = State()
+
+
 # =========================
-# START
+# ▶️ START MENYU
 # =========================
 
 @dp.message(F.text == "/start")
@@ -39,7 +60,7 @@ async def start(message: Message):
     kb = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🗓 Qabulga yozilish"), KeyboardButton(text="🧑‍⚕️ Shifokorlar")],
-            [KeyboardButton(text="💊 Xizmatlar"), KeyboardButton(text="🧠 Savol-javob")],
+            [KeyboardButton(text="💊 Xizmatlar"), KeyboardButton(text="🤖 AI hamshira")],
             [KeyboardButton(text="📍 Manzil & Aloqa"), KeyboardButton(text="🎁 Aksiya")]
         ],
         resize_keyboard=True
@@ -50,8 +71,9 @@ async def start(message: Message):
         reply_markup=kb
     )
 
+
 # =========================
-# BOOKING FLOW
+# 🗓 QABULGA YOZILISH FLOW
 # =========================
 
 @dp.message(F.text == "🗓 Qabulga yozilish")
@@ -137,48 +159,43 @@ async def ask_phone(message: Message, state: FSMContext):
 @dp.message(Booking.phone)
 async def finish_booking(message: Message, state: FSMContext):
     data = await state.get_data()
-
     phone = message.contact.phone_number
 
     user_text = (
         f"✅ Qabul muvaffaqiyatli bron qilindi!\n\n"
-        f"👤 Bemor: {data['name']}\n"
-        f"📞 Telefon: {phone}\n"
-        f"🩺 Yo‘nalish: {data['department']}\n"
-        f"👨‍⚕️ Shifokor: {data['doctor']}\n"
-        f"📅 Sana: {data['date']}\n"
-        f"⏰ Vaqt: {data['time']}\n\n"
-        f"📍 MedLine Plus klinikasi"
+        f"👤 {data['name']}\n"
+        f"📞 {phone}\n"
+        f"🩺 {data['department']}\n"
+        f"👨‍⚕️ {data['doctor']}\n"
+        f"📅 {data['date']}\n"
+        f"⏰ {data['time']}"
     )
 
     admin_text = (
         f"📥 YANGI BRON\n\n"
-        f"👤 Bemor: {data['name']}\n"
-        f"📞 Telefon: {phone}\n"
-        f"🩺 Yo‘nalish: {data['department']}\n"
-        f"👨‍⚕️ Shifokor: {data['doctor']}\n"
-        f"📅 Sana: {data['date']}\n"
-        f"⏰ Vaqt: {data['time']}"
+        f"👤 {data['name']}\n"
+        f"📞 {phone}\n"
+        f"🩺 {data['department']}\n"
+        f"👨‍⚕️ {data['doctor']}\n"
+        f"📅 {data['date']}\n"
+        f"⏰ {data['time']}"
     )
 
-    # FOYDALANUVCHIGA TASDIQ
     await message.answer(user_text)
-
-    # ADMIN PANELGA YUBORISH
     await bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_text)
 
     await state.clear()
 
 
 # =========================
-# STATIC BUTTONS
+# 📋 STATIK MENYULAR
 # =========================
 
 @dp.message(F.text == "🧑‍⚕️ Shifokorlar")
 async def doctors(message: Message):
     await message.answer(
-        "👨‍⚕️ Dr. Akmal Saidov — 15 yil tajriba\n"
-        "👨‍⚕️ Dr. Timur Xasanov — 10 yil tajriba"
+        "👨‍⚕️ Dr. Akmal Saidov — 15 yil\n"
+        "👨‍⚕️ Dr. Timur Xasanov — 10 yil"
     )
 
 
@@ -198,12 +215,58 @@ async def location(message: Message):
         "📍 Toshkent, Yunusobod 15-mavze\n📞 +998 90 000 00 00"
     )
 
+
 # =========================
-# RUN
+# 🤖 AI HAMSHIRA MODULI
+# =========================
+
+async def ask_ai(question: str) -> str:
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Sen tibbiy diagnostika qilmaydigan AI hamshirasan. Faqat xavfsiz tushuntirish ber."},
+                {"role": "user", "content": question}
+            ],
+            max_tokens=350,
+            temperature=0.4
+        )
+
+        return response.choices[0].message.content
+
+    except:
+        return "⛔️ Hozircha AI javob bera olmadi. Keyinroq urinib ko‘ring."
+
+
+@dp.message(F.text == "🤖 AI hamshira")
+async def ai_start(message: Message, state: FSMContext):
+    await state.set_state(AIChat.question)
+    await message.answer("Savolingizni yozing. Men tushuntirib beraman:")
+
+
+@dp.message(AIChat.question)
+async def ai_answer(message: Message, state: FSMContext):
+    user_question = message.text
+
+    ai_response = await ask_ai(user_question)
+
+    final_text = (
+        f"🤖 AI hamshira javobi:\n\n"
+        f"{ai_response}\n\n"
+        f"✅ Agar xohlasangiz, shu masala bo‘yicha qabulga yozib qo‘yaman."
+    )
+
+    await message.answer(final_text)
+    await state.clear()
+
+
+# =========================
+# 🚀 BOTNI ISHGA TUSHIRISH
 # =========================
 
 async def main():
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
